@@ -1,29 +1,86 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Flashcard, DifficultyLevel, FlashcardSettings } from '../types/flashcard';
+import { Flashcard, DifficultyLevel, FlashcardSettings, FlashcardProgress } from '../types/flashcard';
 import { initialFlashcards } from '../data/initialData';
+
+const STORAGE_KEY = 'anki-progress';
+const MS_PER_DAY = 86400000;
+
+const initializeProgress = (cards: Flashcard[]): FlashcardProgress[] => {
+  return cards.map((card) => ({
+    id: card.id,
+    EF: 2.5,
+    interval: 1,
+    repetitions: 0,
+    nextShowAt: 0,
+    lastReview: 0,
+  }));
+};
+
+const calculateNextReview = (
+  progress: FlashcardProgress,
+  grade: number,
+  now: number
+): FlashcardProgress => {
+  let newProgress = { ...progress };
+
+  if (grade >= 3) {
+    newProgress.repetitions += 1;
+    if (newProgress.repetitions === 1) {
+      newProgress.interval = 1;
+    } else if (newProgress.repetitions === 2) {
+      newProgress.interval = 6;
+    } else {
+      newProgress.interval = Math.round(newProgress.interval * newProgress.EF);
+    }
+    
+    let newEF = newProgress.EF + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02));
+    newProgress.EF = Math.max(1.3, newEF);
+    newProgress.nextShowAt = now + newProgress.interval * MS_PER_DAY;
+  } else {
+    newProgress.repetitions = 0;
+    newProgress.interval = 1;
+    newProgress.nextShowAt = now + MS_PER_DAY;
+  }
+  
+  newProgress.lastReview = now;
+  return newProgress;
+};
 
 export const useFlashcards = () => {
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState<number>(0);
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
   const [completedToday, setCompletedToday] = useState<number>(0);
-  const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [settings, setSettings] = useState<FlashcardSettings>({
     isLearningMode: false,
     cardsPerSession: 10,
     isShuffleEnabled: true
   });
   const [difficultCards, setDifficultCards] = useState<Set<number>>(new Set());
-  const [sessionCards, setSessionCards] = useState<number[]>([]);
+  const [progress, setProgress] = useState<FlashcardProgress[]>([]);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
   
   useEffect(() => {
+    const storedProgress = localStorage.getItem(STORAGE_KEY);
+    if (!storedProgress) {
+      const newProgress = initializeProgress(initialFlashcards);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newProgress));
+      setProgress(newProgress);
+    } else {
+      setProgress(JSON.parse(storedProgress));
+    }
+    
+    const now = Date.now();
+    const dueCards = initialFlashcards.filter((card, index) => {
+      const cardProgress = progress[index];
+      return !cardProgress || cardProgress.nextShowAt <= now;
+    });
+    
     const shuffleCards = (cards: Flashcard[]) => 
       settings.isShuffleEnabled ? cards.sort(() => Math.random() - 0.5) : cards;
     
-    const shuffled = shuffleCards([...initialFlashcards]);
-    setCards(shuffled);
-    setSessionCards(shuffled.slice(0, settings.cardsPerSession).map(card => card.id));
-  }, [settings.isShuffleEnabled, settings.cardsPerSession]);
+    setCards(shuffleCards(dueCards));
+  }, [settings.isShuffleEnabled]);
 
   const currentCard = cards[currentCardIndex];
 
@@ -41,59 +98,42 @@ export const useFlashcards = () => {
   const processAnswer = useCallback((difficulty: DifficultyLevel) => {
     if (!currentCard || settings.isLearningMode) return;
 
-    let nextPosition = 0;
-    switch (difficulty) {
-      case 'dontRemember':
-        nextPosition = 1;
-        const newFailureCount = (currentCard.failureCount || 0) + 1;
-        if (newFailureCount >= 2) {
-          setDifficultCards(prev => new Set(prev).add(currentCard.id));
-        }
-        if (newFailureCount >= 3) {
-          setSessionCards(prev => prev.filter(id => id !== currentCard.id));
-          return;
-        }
-        break;
-      case 'hard':
-        nextPosition = 5;
-        break;
-      case 'easy':
-        nextPosition = 10;
-        if (difficultCards.has(currentCard.id)) {
-          setDifficultCards(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(currentCard.id);
-            return newSet;
-          });
-        }
-        break;
-    }
+    const now = Date.now();
+    const gradeMap = { easy: 5, hard: 3, dontRemember: 1 };
+    const grade = gradeMap[difficulty];
     
-    const updatedCards = [...cards];
-    const targetPosition = Math.min(
-      currentCardIndex + nextPosition,
-      updatedCards.length - 1
-    );
+    const cardProgress = progress.find(p => p.id === currentCard.id);
+    if (!cardProgress) return;
     
-    updatedCards.splice(currentCardIndex, 1);
-    updatedCards.splice(targetPosition, 0, {
-      ...currentCard,
-      nextShowAt: targetPosition,
-      failureCount: difficulty === 'dontRemember' ? (currentCard.failureCount || 0) + 1 : 0,
-      isDifficult: difficultCards.has(currentCard.id)
+    const newProgress = calculateNextReview(cardProgress, grade, now);
+    
+    setProgress(prev => {
+      const updated = prev.map(p => p.id === currentCard.id ? newProgress : p);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
     });
-    
-    if (!completedIds.has(currentCard.id)) {
-      setCompletedIds(prev => new Set(prev).add(currentCard.id));
-      setCompletedToday(prev => prev + 1);
+
+    if (difficulty === 'dontRemember') {
+      const newFailureCount = (currentCard.failureCount || 0) + 1;
+      if (newFailureCount >= 2) {
+        setDifficultCards(prev => new Set(prev).add(currentCard.id));
+      }
+    } else if (difficulty === 'easy' && difficultCards.has(currentCard.id)) {
+      setDifficultCards(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(currentCard.id);
+        return newSet;
+      });
     }
     
-    setCards(updatedCards);
+    setCards(prev => prev.filter(card => card.id !== currentCard.id));
     setIsRevealed(false);
-    setCurrentCardIndex(prev => 
-      prev >= updatedCards.length - 1 ? 0 : prev
-    );
-  }, [cards, currentCardIndex, completedIds, currentCard, difficultCards, settings.isLearningMode]);
+    setCompletedToday(prev => prev + 1);
+    
+    if (currentCardIndex >= cards.length - 1) {
+      setCurrentCardIndex(0);
+    }
+  }, [cards, currentCardIndex, currentCard, difficultCards, settings.isLearningMode, progress]);
 
   const navigateCards = useCallback((direction: 'prev' | 'next') => {
     if (direction === 'prev') {
@@ -130,7 +170,21 @@ export const useFlashcards = () => {
     [cards, difficultCards]
   );
 
-  const isSessionComplete = sessionCards.length === 0;
+  const resetProgress = useCallback(() => {
+    const newProgress = initializeProgress(initialFlashcards);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newProgress));
+    setProgress(newProgress);
+    setDifficultCards(new Set());
+    setCompletedToday(0);
+    window.location.reload();
+  }, []);
+
+  const toggleStats = useCallback(() => {
+    setIsStatsOpen(prev => !prev);
+  }, []);
+
+  const isSessionComplete = cards.length === 0;
+  const hasCards = cards.length > 0;
 
   return {
     currentCard,
@@ -145,7 +199,11 @@ export const useFlashcards = () => {
     toggleLearningMode,
     setCardsPerSession,
     toggleShuffle,
-    hasCards: cards.length > 0,
-    navigateCards
+    hasCards,
+    navigateCards,
+    progress,
+    resetProgress,
+    isStatsOpen,
+    toggleStats
   };
 };

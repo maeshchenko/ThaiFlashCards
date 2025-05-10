@@ -1,0 +1,53 @@
+.winxp-window {
+  @apply bg-[#ECE9D8] rounded-lg shadow-xl overflow-hidden;
+  border: 1px solid #0054E3;
+}
+
+.winxp-titlebar {
+  @apply flex items-center justify-between px-2 py-1;
+  background: linear-gradient(180deg, #0058E6 0%, #3A93FF 5%, #288DFF 15%, #0972E7 25%, #0B6CD9 35%, #0B5BC7 45%, #084D9A 55%, #083C86 65%, #083372 75%, #082B5E 85%, #082047 95%, #081B3D 100%);
+}
+
+.winxp-title {
+  @apply text-white font-bold text-sm flex items-center gap-2;
+}
+
+.winxp-controls {
+  @apply flex items-center gap-1;
+}
+
+.winxp-button {
+  @apply w-6 h-6 flex items-center justify-center text-black rounded;
+  background: linear-gradient(180deg, #FFFFFF 0%, #ECE9D8 100%);
+  border: 1px solid #003C74;
+}
+
+.winxp-button:hover {
+  background: linear-gradient(180deg, #FFE8A6 0%, #FFB53A 100%);
+}
+
+.winxp-content {
+  @apply p-4;
+}
+
+.winxp-taskbar {
+  @apply fixed bottom-0 left-0 right-0 h-10 flex items-center px-2;
+  background: linear-gradient(180deg, #245EDB 0%, #3C84F3 3%, #5AA1F3 6%, #3C84F3 10%, #245EDB 14%, #245EDB 100%);
+  border-top: 1px solid #0054E3;
+}
+
+.winxp-start {
+  @apply flex items-center gap-2 px-4 py-2 rounded text-white font-bold;
+  background: linear-gradient(180deg, #388E3C 0%, #2E7D32 100%);
+}
+
+.winxp-start:hover {
+  background: linear-gradient(180deg, #43A047 0%, #388E3C 100%);
+}
+
+.winxp-desktop {
+  @apply min-h-screen bg-[#245EDB] p-4;
+  background-image: url('https://images.pexels.com/photos/2387793/pexels-photo-2387793.jpeg?auto=compress&cs=tinysrgb&w=1920');
+  background-size: cover;
+  background-position: center;
+}

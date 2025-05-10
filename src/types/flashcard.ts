@@ -15,3 +15,12 @@ export interface FlashcardSettings {
   cardsPerSession: number;
   isShuffleEnabled: boolean;
 }
+
+export interface FlashcardProgress {
+  id: number;
+  EF: number;
+  interval: number;
+  repetitions: number;
+  nextShowAt: number;
+  lastReview: number;
+}
