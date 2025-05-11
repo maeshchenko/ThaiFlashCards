@@ -103,7 +103,7 @@ function App() {
                 <div className="text-center p-8 bg-white rounded-lg shadow">
                   <h2 className="text-2xl font-bold text-gray-800 mb-4">Session Complete!</h2>
                   <p className="text-gray-600 mb-6">
-                    You've completed all cards for this session. Take a break or continue practicing.
+                    You've completed {completedToday} cards for this session. Take a break or start a new session.
                   </p>
                   <button
                     onClick={() => window.location.reload()}
@@ -141,7 +141,16 @@ function App() {
               )
             ) : (
               <div className="text-center p-8 bg-white rounded-lg shadow">
-                <p className="text-gray-600">Loading flashcards...</p>
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">Session Complete!</h2>
+                <p className="text-gray-600 mb-6">
+                  You've completed {completedToday} cards for this session. Take a break or start a new session.
+                </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  Start New Session
+                </button>
               </div>
             )}
           </main>

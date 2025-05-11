@@ -237,6 +237,18 @@ const topWords = {
     { word: "ใส่", transcription: "сай", translation: "носить" },
     { word: "เสื้อ", transcription: "сы̂а", translation: "рубашка" },
     { word: "ข้ามถนน", transcription: "кха̂ам тха-но̌н", translation: "переходить дорогу" }
+  ],
+  "letters1": [
+    {word: 'ฟ ฟัน', transcription: 'fo', translation: 'ฟัน (fan) зуб'},
+    {word: 'ห หีบ', transcription: 'ho', translation: 'หีบ (heep) сундук'},
+    {word: 'ก ไก่', transcription: 'ko', translation: 'ไก่ (kai) курица'},
+    {word: 'ด เด็ก', transcription: 'do', translation: 'เด็ก (dek) ребёнок'},
+  ],
+  "letters2": [
+    {word: ' ่ ไม้เอก', transcription: 'mái èek', translation: 'низкий тон'},
+    {word: 'า กา', transcription: 'sà-ra àa', translation: 'กา (gaa) — чай, ворона'},
+    {word: 'ส เสือ', transcription: 'so', translation: 'เสือ (sʉ̌a) — тигр'},
+    {word: 'ว แหวน', transcription: 'wo', translation: 'แหวน (wǎen) — кольцо'},
   ]
 }
 

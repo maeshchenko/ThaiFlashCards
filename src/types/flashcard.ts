@@ -23,4 +23,5 @@ export interface FlashcardProgress {
   repetitions: number;
   nextShowAt: number;
   lastReview: number;
+  repeatInSession: boolean;
 }

@@ -3,6 +3,7 @@ import { Flashcard, DifficultyLevel, FlashcardSettings, FlashcardProgress } from
 import { initialFlashcards } from '../data/initialData';
 
 const STORAGE_KEY = 'anki-progress';
+const SETTINGS_KEY = 'anki-settings';
 const MS_PER_DAY = 86400000;
 
 const initializeProgress = (cards: Flashcard[]): FlashcardProgress[] => {
@@ -13,6 +14,7 @@ const initializeProgress = (cards: Flashcard[]): FlashcardProgress[] => {
     repetitions: 0,
     nextShowAt: 0,
     lastReview: 0,
+    repeatInSession: false
   }));
 };
 
@@ -39,7 +41,8 @@ const calculateNextReview = (
   } else {
     newProgress.repetitions = 0;
     newProgress.interval = 1;
-    newProgress.nextShowAt = now + MS_PER_DAY;
+    newProgress.repeatInSession = true;
+    newProgress.nextShowAt = 0;
   }
   
   newProgress.lastReview = now;
@@ -51,10 +54,13 @@ export const useFlashcards = () => {
   const [currentCardIndex, setCurrentCardIndex] = useState<number>(0);
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
   const [completedToday, setCompletedToday] = useState<number>(0);
-  const [settings, setSettings] = useState<FlashcardSettings>({
-    isLearningMode: false,
-    cardsPerSession: 10,
-    isShuffleEnabled: true
+  const [settings, setSettings] = useState<FlashcardSettings>(() => {
+    const savedSettings = localStorage.getItem(SETTINGS_KEY);
+    return savedSettings ? JSON.parse(savedSettings) : {
+      isLearningMode: false,
+      cardsPerSession: 10,
+      isShuffleEnabled: true
+    };
   });
   const [difficultCards, setDifficultCards] = useState<Set<number>>(new Set());
   const [progress, setProgress] = useState<FlashcardProgress[]>([]);
@@ -79,8 +85,9 @@ export const useFlashcards = () => {
     const shuffleCards = (cards: Flashcard[]) => 
       settings.isShuffleEnabled ? cards.sort(() => Math.random() - 0.5) : cards;
     
-    setCards(shuffleCards(dueCards));
-  }, [settings.isShuffleEnabled]);
+    const limitedCards = shuffleCards(dueCards).slice(0, settings.cardsPerSession);
+    setCards(limitedCards);
+  }, [settings.isShuffleEnabled, settings.cardsPerSession]);
 
   const currentCard = cards[currentCardIndex];
 
@@ -114,19 +121,29 @@ export const useFlashcards = () => {
     });
 
     if (difficulty === 'dontRemember') {
-      const newFailureCount = (currentCard.failureCount || 0) + 1;
-      if (newFailureCount >= 2) {
-        setDifficultCards(prev => new Set(prev).add(currentCard.id));
+      const updatedCards = cards.filter(card => card.id !== currentCard.id);
+      
+      if (!cardProgress.repeatInSession) {
+        const insertPosition = Math.min(
+          currentCardIndex + 2 + Math.floor(Math.random() * 2),
+          updatedCards.length
+        );
+        updatedCards.splice(insertPosition, 0, currentCard);
       }
-    } else if (difficulty === 'easy' && difficultCards.has(currentCard.id)) {
-      setDifficultCards(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(currentCard.id);
-        return newSet;
-      });
+      
+      setCards(updatedCards);
+      setDifficultCards(prev => new Set(prev).add(currentCard.id));
+    } else {
+      setCards(prev => prev.filter(card => card.id !== currentCard.id));
+      if (difficulty === 'easy' && difficultCards.has(currentCard.id)) {
+        setDifficultCards(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(currentCard.id);
+          return newSet;
+        });
+      }
     }
     
-    setCards(prev => prev.filter(card => card.id !== currentCard.id));
     setIsRevealed(false);
     setCompletedToday(prev => prev + 1);
     
@@ -144,30 +161,44 @@ export const useFlashcards = () => {
   }, [cards.length]);
 
   const toggleLearningMode = useCallback(() => {
-    setSettings(prev => ({
-      ...prev,
-      isLearningMode: !prev.isLearningMode
-    }));
+    setSettings(prev => {
+      const newSettings = {
+        ...prev,
+        isLearningMode: !prev.isLearningMode
+      };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
+      return newSettings;
+    });
     setIsRevealed(false);
   }, []);
 
   const setCardsPerSession = useCallback((count: number) => {
-    setSettings(prev => ({
-      ...prev,
-      cardsPerSession: count
-    }));
+    setSettings(prev => {
+      const newSettings = {
+        ...prev,
+        cardsPerSession: count
+      };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
+      return newSettings;
+    });
+    setCurrentCardIndex(0);
+    setCompletedToday(0);
   }, []);
 
   const toggleShuffle = useCallback(() => {
-    setSettings(prev => ({
-      ...prev,
-      isShuffleEnabled: !prev.isShuffleEnabled
-    }));
+    setSettings(prev => {
+      const newSettings = {
+        ...prev,
+        isShuffleEnabled: !prev.isShuffleEnabled
+      };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
+      return newSettings;
+    });
   }, []);
 
   const getDifficultWords = useCallback(() => 
-    cards.filter(card => difficultCards.has(card.id)), 
-    [cards, difficultCards]
+    initialFlashcards.filter(card => difficultCards.has(card.id)), 
+    [difficultCards]
   );
 
   const resetProgress = useCallback(() => {
